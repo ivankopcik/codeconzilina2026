@@ -167,7 +167,7 @@ body {
 }
 
 /* výber postavičky v menu */
-.avatars { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.avatars { display: grid; grid-template-columns: repeat(var(--n, 5), 1fr); gap: 8px; }
 .avatar {
   display: grid; justify-items: center; gap: 2px;
   padding: 6px 2px; border-radius: 12px; cursor: pointer;
