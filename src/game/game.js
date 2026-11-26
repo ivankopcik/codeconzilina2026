@@ -23,6 +23,9 @@ const BLOCK_SHAKE = 0.35
 const TRAIL_LEN = 36
 const TRAIL_EVERY = 3
 const LONG_AGO = -100
+const KO_SPEED = 0.25 // K.O. slow-mo: rýchlosť animácie pri poslednom zásahu (fyzika sa nemení)
+const KO_STEPS = 72 // koľko krokov dráhy pred dopadom ide spomalene (~0.6 s)
+const SLOWMO_DECAY = 0.8
 
 const MSG = {
   turn: (name) => `Na ťahu: ${name}`,
@@ -46,7 +49,7 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
   let view = { scale: 1, ox: 0, oy: 0, dpr: 1 }
   let turnNo = 0
   let turnReady = false // ťah začal a ešte sa nehodilo
-  let flight = null // { res, shooter, start }
+  let flight = null // { res, shooter, clock, ko }
   let drag = null // { x, y, id }
   let usingKeys = false
   let keyAim = { angle: 45 * DEG, power: 0.6 }
@@ -67,6 +70,7 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     wind: 0,
     effects: [],
     shake: 0,
+    slowmo: 0, // 0..1, K.O. spomalenie pri poslednom zásahu
   }
 
   // Herné udalosti: zvuk (GRAFIKA) + komentátor Mrázik. Typy: start|throw|hit|block|splash|out|matchpoint|win|lose
@@ -115,11 +119,9 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
   function throwBall({ angle, power }) {
     const shooter = state.turn
     turnReady = false
-    flight = {
-      res: simulateThrow({ shooter, angle, power, wind: state.wind, snowmen: state.snowmen, players: state.players }),
-      shooter,
-      start: state.t,
-    }
+    const res = simulateThrow({ shooter, angle, power, wind: state.wind, snowmen: state.snowmen, players: state.players })
+    const ko = res.outcome === 'hit' && state.players[shooter].hits + 1 >= HITS_TO_WIN
+    flight = { res, shooter, clock: 0, ko }
     state.phase = 'flying'
     state.aim = null
     state.players[shooter].lastThrowT = state.t
@@ -188,9 +190,13 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
   }
 
   // --- animácia letu po predpočítaných bodoch ---
-  function updateFlight() {
+  const timeScale = () => 1 - (1 - KO_SPEED) * state.slowmo
+
+  function updateFlight(dt) {
     const { path } = flight.res
-    const i = Math.min(path.length - 1, Math.floor((state.t - flight.start) * STEPS_PER_S))
+    if (flight.ko && path.length - 1 - flight.clock * STEPS_PER_S < KO_STEPS) state.slowmo = 1
+    flight.clock += dt * timeScale()
+    const i = Math.min(path.length - 1, Math.floor(flight.clock * STEPS_PER_S))
     const p = path[i]
     const prev = path[Math.max(0, i - 1)]
     state.ball = { x: p.x, y: p.y, vx: (p.x - prev.x) * STEPS_PER_S, vy: (p.y - prev.y) * STEPS_PER_S }
@@ -203,8 +209,9 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     const dt = Math.min(0.05, (now - last) / 1000)
     last = now
     state.t += dt
-    if (flight) updateFlight()
-    state.effects.forEach((e) => (e.age += dt))
+    if (flight) updateFlight(dt)
+    else state.slowmo = Math.max(0, state.slowmo - dt * SLOWMO_DECAY)
+    state.effects.forEach((e) => (e.age += dt * timeScale()))
     state.effects = state.effects.filter((e) => e.age < EFFECT_LIFE)
     state.shake = Math.max(0, state.shake - dt * SHAKE_DECAY)
 
