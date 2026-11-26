@@ -1,4 +1,5 @@
 import './commentator.css'
+import { isMuted } from '../sfx.js'
 
 // Komentátor zápasu „Mrázik“: roast hlášky ako bublina + voliteľne TTS.
 const LINES = {
@@ -98,28 +99,10 @@ export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'],
   const root = document.createElement('div')
   root.className = 'cm-root'
   root.innerHTML = `
-    <div class="cm-bubble" hidden><div class="cm-label">🎙️ Mrázik</div><div class="cm-text"></div></div>
-    <button class="cm-tts" type="button"></button>`
+    <div class="cm-bubble" hidden><div class="cm-label">🎙️ Mrázik</div><div class="cm-text"></div></div>`
   const bubble = root.querySelector('.cm-bubble')
   const textEl = root.querySelector('.cm-text')
-  const btn = root.querySelector('.cm-tts')
   container.appendChild(root)
-
-  const renderBtn = () => {
-    btn.textContent = ttsOn ? '🔊' : '🔇'
-    btn.setAttribute('aria-label', ttsOn ? 'Vypnúť hlas komentátora' : 'Zapnúť hlas komentátora')
-  }
-  renderBtn()
-  if (!synth) btn.hidden = true
-
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation()
-    ttsOn = !ttsOn
-    lsSet(ttsOn ? '1' : '0')
-    if (!ttsOn) synth?.cancel()
-    renderBtn()
-  })
-  btn.addEventListener('pointerdown', (e) => e.stopPropagation())
 
   // iOS: speech sa musí odomknúť v rámci user gesta
   const unlock = () => {
@@ -135,7 +118,7 @@ export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'],
   }
 
   function speak(text) {
-    if (!ttsOn || !synth) return
+    if (!ttsOn || !synth || isMuted()) return // hlas stíši aj globálne #mute
     const v = pickVoice()
     if (!v) return
     const clean = text.replace(EMOJI_RE, '').replace(/\s+/g, ' ').trim()
@@ -183,8 +166,7 @@ export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'],
   function destroy() {
     clearTimeout(hideTimer)
     window.removeEventListener('pointerdown', unlock)
-    synth?.cancel()
-    root.remove()
+    root.remove() // reč nerušíme, nech K.O. hláška dobehne aj na obrazovke výsledkov
   }
 
   return { say, destroy }

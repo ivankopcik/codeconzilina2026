@@ -61,7 +61,7 @@ export function connect() {
         onThrow: (cb) => on('throw', ({ angle, power }) => cb({ angle, power })),
         onLeft: (cb) => on('left', cb),
         close: () => ws.close(),
-      }),
+      })),
     )
   })
 }

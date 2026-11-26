@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 3000
 const DATA_DIR = new URL('./data/', import.meta.url)
 const DATA_FILE = new URL('entries.json', DATA_DIR)
 const TMP_FILE = new URL('entries.json.tmp', DATA_DIR)
-const MAX_ENTRIES = 20000 // strop proti spamu, aby súbor a pamäť nerástli donekonečna
+const MAX_ENTRIES = 500_000 // poistka, aby súbor a pamäť nerástli donekonečna (~125 MB)
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
 const MAX_BODY = 10 * 1024
 const MAX_LEN = 60
@@ -41,32 +41,45 @@ async function loadEntries() {
 }
 const entries = await loadEntries()
 
+// Súbežné záznamy sa zlúčia do jedného zápisu (pri náraste publika sa nezapisuje celý súbor N-krát).
 let saving = Promise.resolve()
+let nextWrite = null
 function addEntry(entry) {
   entries.push(entry)
-  const write = saving.then(async () => {
+  nextWrite ??= saving.then(async () => {
+    nextWrite = null // záznamy pridané počas zápisu pôjdu do ďalšieho
     await mkdir(DATA_DIR, { recursive: true })
     await writeFile(TMP_FILE, JSON.stringify(entries))
     await rename(TMP_FILE, DATA_FILE)
   })
-  saving = write.catch((err) => console.error('Zápis záznamov zlyhal', err)) // chyba nezablokuje ďalšie zápisy
-  return write
+  saving = nextWrite.catch((err) => console.error('Zápis záznamov zlyhal', err)) // chyba nezablokuje ďalšie zápisy
+  return nextWrite
 }
-const emailKey = (e) => String(e.email ?? '').toLowerCase()
+const emailKey = (e) => String(e.email ?? '').trim().toLowerCase().normalize('NFKC')
 
 // Proti spamu: limit na IP za minútu (voľný, publikum je za jednou WiFi NAT) a strop na e-mail.
-// Port 3000 je za firewallom, X-Real-IP nastavuje len nginx.
-const IP_PER_MIN = 60
-const PER_EMAIL = 20
+// X-Real-IP berieme len od nginx na loopbacku, inak priamu adresu spojenia.
+const IP_PER_MIN = 1000
+const PER_EMAIL = 500
+const MINUTE = 60_000
+const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1'])
 const recentByIp = new Map()
+const clientIp = (req) =>
+  (LOOPBACK.has(req.socket.remoteAddress) && req.headers['x-real-ip']) || req.socket.remoteAddress
+const fresh = (times, now) => times.filter((t) => now - t < MINUTE)
 function tooManyFromIp(req) {
-  const ip = req.headers['x-real-ip'] || req.socket.remoteAddress
+  const ip = clientIp(req)
   const now = Date.now()
-  const recent = (recentByIp.get(ip) || []).filter((t) => now - t < 60_000)
+  const recent = fresh(recentByIp.get(ip) || [], now)
   recent.push(now)
   recentByIp.set(ip, recent)
   return recent.length > IP_PER_MIN
 }
+// upratovanie, aby mapa nerástla donekonečna
+setInterval(() => {
+  const now = Date.now()
+  for (const [ip, times] of recentByIp) if (!fresh(times, now).length) recentByIp.delete(ip)
+}, MINUTE).unref()
 const reject = (status, message) => {
   throw Object.assign(new Error(message), { status })
 }
@@ -127,7 +140,7 @@ const routes = {
       id: randomUUID(),
       ts: Date.now(),
       name: body.name.trim(),
-      email: body.email.trim(),
+      email: emailKey(body),
       mode: body.mode,
       won: body.won,
       score: body.score,

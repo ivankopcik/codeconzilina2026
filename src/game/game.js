@@ -5,6 +5,7 @@ import { simulateThrow, aimPreview, dirOf, STEPS_PER_S } from './physics.js'
 import { chooseThrow } from './ai.js'
 import { makeSnowmen, windForTurn } from './rng.js'
 import { sfx } from '../sfx.js'
+import { createCommentator } from '../fun/commentator.js'
 
 const DEG = Math.PI / 180
 const MAX_ANGLE = 85 * DEG
@@ -68,6 +69,13 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     shake: 0,
   }
 
+  // Herné udalosti: zvuk (GRAFIKA) + komentátor Mrázik. Typy: start|throw|hit|block|splash|out|matchpoint|win|lose
+  const commentator = createCommentator(canvas.parentElement, { names, me, mode })
+  function emit(type, data = {}) {
+    sfx(type === 'matchpoint' ? 'hit' : type)
+    commentator.say(type === 'lose' ? 'win' : type, data)
+  }
+
   const later = (ms, fn) => {
     const id = setTimeout(() => {
       timers.delete(id)
@@ -115,7 +123,7 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     state.phase = 'flying'
     state.aim = null
     state.players[shooter].lastThrowT = state.t
-    sfx('throw')
+    emit('throw', { shooter })
     if (shooter === me) myThrows++
   }
 
@@ -135,10 +143,7 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     flight = null
     state.ball = null
     state.trail = []
-    if (res.outcome !== 'out') {
-      state.effects.push({ type: res.outcome, x: res.at.x, y: res.at.y, age: 0 })
-      sfx(res.outcome)
-    }
+    if (res.outcome !== 'out') state.effects.push({ type: res.outcome, x: res.at.x, y: res.at.y, age: 0 })
     if (res.outcome === 'block') state.shake = Math.max(state.shake, BLOCK_SHAKE)
     if (res.outcome === 'hit') {
       state.players[shooter].hits++
@@ -147,11 +152,14 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
       if (state.players[shooter].hits >= HITS_TO_WIN) {
         state.phase = 'over'
         state.message = MSG.won(names[shooter])
-        sfx(shooter === me ? 'win' : 'lose')
+        sfx('hit')
+        emit(shooter === me ? 'win' : 'lose', { shooter })
         later(END_DELAY_MS, () => finish(shooter === me))
         return
       }
     }
+    const hits = state.players[shooter].hits
+    emit(res.outcome === 'hit' && hits === HITS_TO_WIN - 1 ? 'matchpoint' : res.outcome, { shooter })
     state.phase = 'wait'
     later(NEXT_TURN_MS, () => {
       turnNo++
@@ -313,10 +321,12 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     timers.forEach(clearTimeout)
     timers.clear()
     listeners.forEach(([el, type, fn]) => el.removeEventListener(type, fn))
+    commentator.destroy()
   }
 
   resize()
   beginTurn()
+  emit('start')
   raf = requestAnimationFrame(frame)
   return { destroy }
 }

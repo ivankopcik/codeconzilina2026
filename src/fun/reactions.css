@@ -1,0 +1,93 @@
+.rx-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 15;
+}
+
+.rx-fly {
+  position: absolute;
+  bottom: -4rem;
+  line-height: 1;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+  animation: rx-rise 2.8s cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+}
+
+@keyframes rx-rise {
+  0% { transform: translate(0, 0) scale(0.4) rotate(-15deg); opacity: 0; }
+  12% { opacity: 1; transform: translate(0, -12vh) scale(1.15) rotate(8deg); }
+  100% { transform: translate(var(--drift), -105vh) scale(0.9) rotate(-8deg); opacity: 0; }
+}
+
+/* QR pre fanúšikov na pódiovej obrazovke, na mobile hráča schovaný */
+.rx-fans {
+  position: fixed;
+  right: 12px;
+  bottom: 12px;
+  z-index: 16;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-radius: var(--radius);
+  background: rgba(11, 16, 38, 0.82);
+  border: 2px solid var(--gold);
+  font: 800 13px/1.2 var(--font);
+  color: var(--fg);
+  pointer-events: none;
+}
+.rx-fans canvas { border-radius: 8px; }
+.rx-count { color: var(--gold); font-size: 12px; }
+@media (min-width: 900px) and (pointer: fine) {
+  .rx-fans { display: flex; }
+}
+
+.rx-hype {
+  position: fixed;
+  top: 22%;
+  left: 50%;
+  z-index: 17;
+  transform: translate(-50%, 0) scale(0);
+  font: 900 clamp(28px, 6vw, 84px)/1 var(--font);
+  color: var(--gold);
+  text-shadow: 0 0 24px var(--accent), 0 6px 0 #000;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.3, 1.6, 0.5, 1), opacity 0.3s;
+}
+.rx-hype.on { transform: translate(-50%, 0) scale(1) rotate(-4deg); opacity: 1; }
+
+/* Mobil fanúšika */
+.rx-watch {
+  width: min(92vw, 480px);
+  text-align: center;
+  align-items: center;
+  position: relative;
+  z-index: 16;
+}
+.rx-status { color: var(--gold); font-weight: 800; }
+.rx-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--gap);
+  width: 100%;
+}
+.rx-btn {
+  aspect-ratio: 1;
+  font-size: clamp(2.4rem, 12vw, 3.4rem);
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.rx-btn:active { background: rgba(255, 209, 102, 0.25); }
+.rx-btn.pop { animation: rx-pop 0.25s ease-out; }
+@keyframes rx-pop {
+  50% { transform: scale(1.18) rotate(-6deg); border-color: var(--gold); }
+}
+.rx-sent { color: var(--muted); font-weight: 700; }

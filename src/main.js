@@ -4,6 +4,7 @@ import { startGame } from './game/game.js'
 import { showLobby } from './lobby.js'
 import { showResults } from './results.js'
 import { sfx, music, toggleMute, isMuted } from './sfx.js'
+import { attachReactions, showWatch } from './fun/reactions.js'
 
 const $ = (sel) => document.querySelector(sel)
 const nameInput = $('#name')
@@ -37,8 +38,11 @@ function playerName() {
 
 let game = null
 let net = null
+let fans = null // emoji od fanúšikov (len VS)
 function play(opts) {
   game?.destroy()
+  fans?.destroy()
+  fans = opts.net ? attachReactions($('#screen-game'), opts.net) : null
   showScreen('screen-game')
   game = startGame({
     canvas: $('#game'),
@@ -52,6 +56,8 @@ function play(opts) {
 
 function toMenu() {
   game?.destroy()
+  fans?.destroy()
+  fans = null
   net?.close?.()
   game = net = null
   history.replaceState(null, '', location.pathname)
@@ -83,6 +89,13 @@ const actions = {
 
 menu.addEventListener('click', (e) => actions[e.target.closest('[data-action]')?.dataset.action]?.())
 roomInput.addEventListener('keydown', (e) => e.key === 'Enter' && actions.join())
+
+// Fanúšik cez QR z hernej obrazovky: ?watch=KOD → emoji pad
+const watching = new URLSearchParams(location.search).get('watch')
+if (watching) {
+  showScreen('screen-watch')
+  showWatch($('#screen-watch'), { room: watching })
+}
 
 // Pozvánka cez QR: ?room=KOD → predvyplň kód a zvýrazni Pripojiť sa
 const invited = new URLSearchParams(location.search).get('room')

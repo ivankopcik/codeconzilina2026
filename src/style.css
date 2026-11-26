@@ -144,3 +144,25 @@ body {
   background: rgba(11, 16, 38, 0.55);
   backdrop-filter: blur(6px);
 }
+@media (max-aspect-ratio: 1/1) {
+  #screen-menu.active { align-items: start; padding-top: max(4vh, env(safe-area-inset-top)); }
+}
+
+/* mobil na výšku počas hry: nenápadná výzva otočiť telefón (hrať sa dá aj tak) */
+@media (orientation: portrait) and (max-width: 700px) {
+  #screen-game.active::after {
+    content: '📱↻ Otoč telefón na šírku';
+    position: fixed;
+    top: max(16px, env(safe-area-inset-top));
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(11, 16, 38, 0.75);
+    color: var(--fg);
+    font: 800 1rem var(--font);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 5;
+  }
+}
