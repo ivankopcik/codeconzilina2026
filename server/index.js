@@ -3,6 +3,7 @@ import http from 'node:http'
 import { randomInt, randomUUID } from 'node:crypto'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { WebSocketServer } from 'ws'
+import { HITS_TO_WIN } from '../src/config.js'
 
 const PORT = process.env.PORT || 3000
 const DATA_DIR = new URL('./data/', import.meta.url)
@@ -36,7 +37,11 @@ function addEntry(entry) {
   writeQueue = writeQueue.then(async () => {
     await mkdir(DATA_DIR, { recursive: true })
     const entries = await readEntries()
-    entries.push(entry)
+    // jeden záznam na e-mail a režim, ponecháme ten lepší
+    const key = (e) => `${e.email.toLowerCase()}|${e.mode}`
+    const i = entries.findIndex((e) => key(e) === key(entry))
+    if (i < 0) entries.push(entry)
+    else if (byRank(entry, entries[i]) < 0) entries[i] = entry
     await writeFile(DATA_FILE, JSON.stringify(entries, null, 2))
   })
   return writeQueue
@@ -65,7 +70,10 @@ function readBody(req) {
 }
 
 const isStr = (v) => typeof v === 'string' && v.trim().length > 0 && v.length <= MAX_LEN
-const isHits = (v) => Number.isInteger(v) && v >= 0 && v <= 99
+const isHits = (v) => Number.isInteger(v) && v >= 0 && v <= HITS_TO_WIN
+// výsledok musí sedieť so skóre: obaja nemôžu mať 5, víťaz nemá menej ako porazený
+const isConsistent = ({ won, score: [mine, theirs] }) =>
+  !(mine === HITS_TO_WIN && theirs === HITS_TO_WIN) && (won ? mine >= theirs : mine <= theirs)
 
 function validateEntry(b) {
   if (!isStr(b.name)) return 'Neplatné meno'
@@ -73,6 +81,7 @@ function validateEntry(b) {
   if (!MODES.includes(b.mode)) return 'Neplatný režim'
   if (typeof b.won !== 'boolean') return 'Neplatný výsledok'
   if (!Array.isArray(b.score) || b.score.length !== 2 || !b.score.every(isHits)) return 'Neplatné skóre'
+  if (!isConsistent(b)) return 'Výsledok nesedí so skóre'
   if (typeof b.accuracy !== 'number' || !(b.accuracy >= 0 && b.accuracy <= 1)) return 'Neplatná presnosť'
   return null
 }
