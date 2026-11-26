@@ -9,7 +9,7 @@ const HYPE_COUNT = 12 // toľko emoji za HYPE_WINDOW_MS = "publikum šalie"
 const HYPE_WINDOW_MS = 3000
 const HYPE_COOLDOWN_MS = 6000
 const HYPE_SHOW_MS = 2200
-const QR_SIZE = 140
+const QR_SIZE = 120
 const rnd = (a, b) => a + Math.random() * (b - a)
 
 export const watchUrl = (room) => `${location.origin}/?watch=${room}`

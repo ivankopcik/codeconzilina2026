@@ -24,7 +24,7 @@
 .rx-fans {
   position: fixed;
   right: 12px;
-  bottom: 12px;
+  top: 27%; /* obloha nad hráčom 1, HUD je hore, hráč 1 dole vpravo */
   z-index: 16;
   display: none;
   flex-direction: column;

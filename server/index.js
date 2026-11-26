@@ -40,12 +40,36 @@ async function loadEntries() {
   return []
 }
 const entries = await loadEntries()
+const emailKey = (e) => String(e.email ?? '').trim().toLowerCase().normalize('NFKC')
+
+// Indexy v pamäti, aby požiadavky neprechádzali všetky záznamy: počet na e-mail a cache rebríčka.
+const perEmail = new Map()
+const countEmail = (e) => perEmail.set(emailKey(e), (perEmail.get(emailKey(e)) || 0) + 1)
+entries.forEach(countEmail)
+const boards = new Map() // mode → top N, maže sa pri každom novom zázname
+function leaderboard(mode) {
+  if (!boards.has(mode)) {
+    const seen = new Set() // v rebríčku len najlepší výsledok na e-mail
+    boards.set(
+      mode,
+      entries
+        .filter((e) => e.mode === mode)
+        .sort(byRank)
+        .filter((e) => !seen.has(emailKey(e)) && seen.add(emailKey(e)))
+        .slice(0, LEADERBOARD_SIZE)
+        .map(({ name, score, accuracy, won, ts }) => ({ name, score, accuracy, won, ts })),
+    )
+  }
+  return boards.get(mode)
+}
 
 // Súbežné záznamy sa zlúčia do jedného zápisu (pri náraste publika sa nezapisuje celý súbor N-krát).
 let saving = Promise.resolve()
 let nextWrite = null
 function addEntry(entry) {
   entries.push(entry)
+  countEmail(entry)
+  boards.clear()
   nextWrite ??= saving.then(async () => {
     nextWrite = null // záznamy pridané počas zápisu pôjdu do ďalšieho
     await mkdir(DATA_DIR, { recursive: true })
@@ -55,7 +79,6 @@ function addEntry(entry) {
   saving = nextWrite.catch((err) => console.error('Zápis záznamov zlyhal', err)) // chyba nezablokuje ďalšie zápisy
   return nextWrite
 }
-const emailKey = (e) => String(e.email ?? '').trim().toLowerCase().normalize('NFKC')
 
 // Proti spamu: limit na IP za minútu (voľný, publikum je za jednou WiFi NAT) a strop na e-mail.
 // X-Real-IP berieme len od nginx na loopbacku, inak priamu adresu spojenia.
@@ -134,7 +157,7 @@ const routes = {
     const error = validateEntry(body)
     if (error) reject(400, error)
     if (tooManyFromIp(req)) reject(429, 'Príliš veľa pokusov, skús o chvíľu')
-    if (entries.filter((e) => emailKey(e) === emailKey(body)).length >= PER_EMAIL) reject(429, 'Z tohto e-mailu už máš dosť záznamov')
+    if ((perEmail.get(emailKey(body)) || 0) >= PER_EMAIL) reject(429, 'Z tohto e-mailu už máš dosť záznamov')
     if (entries.length >= MAX_ENTRIES) reject(503, 'Súťaž je plná')
     const entry = {
       id: randomUUID(),
@@ -152,14 +175,8 @@ const routes = {
 
   'GET /api/leaderboard': async (req, url) => {
     const mode = url.searchParams.get('mode')
-    if (!MODES.includes(mode)) throw Object.assign(new Error('Neplatný režim'), { status: 400 })
-    const seen = new Set() // v rebríčku len najlepší výsledok na e-mail
-    return entries
-      .filter((e) => e.mode === mode)
-      .sort(byRank)
-      .filter((e) => !seen.has(emailKey(e)) && seen.add(emailKey(e)))
-      .slice(0, LEADERBOARD_SIZE)
-      .map(({ name, score, accuracy, won, ts }) => ({ name, score, accuracy, won, ts }))
+    if (!MODES.includes(mode)) reject(400, 'Neplatný režim')
+    return leaderboard(mode)
   },
 }
 
