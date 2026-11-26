@@ -1,5 +1,6 @@
 import './commentator.css'
 import { isMuted } from '../sfx.js'
+const SPEECH_ENABLED = false // TTS z prehliadača je robotický, hlášky sú len v bubline
 
 // Komentátor zápasu „Mrázik“: roast hlášky ako bublina + voliteľne TTS.
 const LINES = {
@@ -118,6 +119,7 @@ export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'],
   }
 
   function speak(text) {
+    if (!SPEECH_ENABLED) return // prehliadačový TTS znie príliš roboticky, Mrázik len píše
     if (!ttsOn || !synth || isMuted()) return // hlas stíši aj globálne #mute
     const v = pickVoice()
     if (!v) return
