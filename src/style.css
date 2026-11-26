@@ -78,20 +78,19 @@ body {
 
 .menu.joining [data-action='join'] { background: linear-gradient(135deg, var(--accent-2), #3a86ff); border: none; }
 
-/* --- AI pozadie (Higgsfield) pre menu, lobby a výsledky; mobil na výšku = menu.webp, široké = bg.webp --- */
-.screen:not(#screen-game) {
-  background:
-    linear-gradient(180deg, rgba(11, 16, 38, 0.35), rgba(11, 16, 38, 0.15) 40%, rgba(11, 16, 38, 0.55)),
-    url('/assets/menu.webp') center / cover no-repeat,
-    var(--bg);
+/* --- AI video pozadie (Higgsfield) pre menu, lobby a výsledky; poster = statický obrázok ako fallback --- */
+#bg-video {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center bottom;
+  pointer-events: none;
 }
-@media (min-aspect-ratio: 1/1) {
-  .screen:not(#screen-game) {
-    background:
-      linear-gradient(180deg, rgba(11, 16, 38, 0.3), rgba(11, 16, 38, 0.6)),
-      url('/assets/bg.webp') center bottom / cover no-repeat,
-      var(--bg);
-  }
+.screen { z-index: 1; }
+.screen:not(#screen-game) {
+  background: linear-gradient(180deg, rgba(11, 16, 38, 0.35), rgba(11, 16, 38, 0.15) 40%, rgba(11, 16, 38, 0.55));
 }
 
 /* sneženie cez CSS (dve vrstvy vločiek) */

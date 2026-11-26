@@ -11,8 +11,16 @@ const nameInput = $('#name')
 const roomInput = $('#room')
 const menu = $('#screen-menu')
 
+// AI video pozadie (Higgsfield): na výšku menu.mp4, na šírku bg.mp4; počas hry pauza (canvas má vlastné)
+const bgVideo = $('#bg-video')
+const bgName = matchMedia('(max-aspect-ratio: 1/1)').matches ? 'menu' : 'bg'
+bgVideo.poster = `/assets/${bgName}.webp`
+bgVideo.src = `/assets/${bgName}.mp4`
+
 export function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id))
+  if (id === 'screen-game') bgVideo.pause()
+  else bgVideo.play().catch(() => {})
 }
 
 // Zvuk: klik na tlačidlá + hudba po prvom geste, prepínač 🔊/🔇
