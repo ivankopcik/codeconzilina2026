@@ -78,6 +78,46 @@ const LINES = {
   ],
 }
 
+// Nahrávky hlasom Ivana Kopčíka (ElevenLabs eleven_v4), text v bubline = presne to, čo znie
+const VOICE = {
+  start: [['start1', 'Dámy a páni, guľovačka roka! Nech lietajú gule, nie bugy!']],
+  hit: [['hit1', 'BUM! Zásah ako bug v produkcii!'], ['hit2', 'Headshot! Presnejšie ako AI autocomplete.']],
+  cpuHit: [['cpuhit1', 'Umelá inteligencia 1, prirodzená hlúposť 0.']],
+  block: [['block1', 'Snehuliak to schytal! Hrdina dňa, bez platu.'], ['block2', 'Snehuliak, jediný tester, ktorý reálne zachytil chybu.']],
+  splash: [['splash1', 'Pľuf! Do snehu, ako pull request bez review.'], ['splash2', 'Zem trafená na sto percent. Aspoň niečo.']],
+  out: [['out1', 'Tá guľa letí na Malú Fatru! Pošlite záchranku!'], ['out2', 'Ďakujeme za hod, guľa je teraz v cloude.']],
+  matchpoint: [['matchpoint1', 'Štyri na tabuli! Ešte jedna… FINISH HIM!']],
+  win: [['win1', 'K.O.! Máme víťaza! FATALITY!']],
+}
+const VOICE_CHANCE = 0.6 // inak textová hláška s menami (bez zvuku)
+const VOICE_ALWAYS = ['start', 'matchpoint', 'win']
+const clips = {} // načítané až po prvom geste (autoplay policy)
+let playing = null // nová hláška preruší starú
+
+function loadClips() {
+  Object.values(VOICE).flat().forEach(([id]) => {
+    if (clips[id]) return
+    const a = new Audio(`/voice/${id}.mp3`)
+    a.preload = 'auto'
+    clips[id] = a
+  })
+}
+
+// prvé gesto kdekoľvek v appke (napr. klik na „Hraj“) odomkne a prednačíta nahrávky
+if (typeof window !== 'undefined') window.addEventListener('pointerdown', loadClips, { once: true })
+
+function playClip(id) {
+  try {
+    playing?.pause()
+    if (isMuted()) return
+    loadClips()
+    const a = clips[id]
+    a.currentTime = 0
+    playing = a
+    a.play().catch(() => {})
+  } catch {}
+}
+
 const EMOJI_RE = /\p{Extended_Pictographic}/gu
 const SHOW_MS = 3500
 const LS_KEY = 'tts'
@@ -107,7 +147,8 @@ export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'],
 
   // iOS: speech sa musí odomknúť v rámci user gesta
   const unlock = () => {
-    try { synth?.speak(new SpeechSynthesisUtterance('')) } catch {}
+    loadClips()
+    if (SPEECH_ENABLED) try { synth?.speak(new SpeechSynthesisUtterance('')) } catch {}
   }
   window.addEventListener('pointerdown', unlock, { once: true })
 
@@ -146,7 +187,10 @@ export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'],
     const s = type === 'start' || shooter == null ? 0 : shooter
     let cat = type
     if (type === 'hit' && mode === 'cpu' && s !== me && Math.random() < 0.5) cat = 'cpuHit'
-    const text = pick(cat)
+    const voiced = VOICE[cat] && !isMuted() && (VOICE_ALWAYS.includes(cat) || Math.random() < VOICE_CHANCE)
+    const [clip, voicedText] = voiced ? VOICE[cat][Math.floor(Math.random() * VOICE[cat].length)] : []
+    if (voiced) playClip(clip)
+    const text = voicedText || pick(cat)
       .replaceAll('{n}', names[s] ?? '')
       .replaceAll('{o}', names[1 - s] ?? '')
 
