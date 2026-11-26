@@ -51,12 +51,12 @@ export function connect() {
     const api = {}
     ws.addEventListener('open', () =>
       resolve(Object.assign(api, {
-        create: (name) => request({ t: 'create', name }, 'created').then(remember),
-        join: (room, name) => request({ t: 'join', room, name }, 'joined').then(remember),
+        create: (name, avatar) => request({ t: 'create', name, avatar }, 'created').then(remember),
+        join: (room, name, avatar) => request({ t: 'join', room, name, avatar }, 'joined').then(remember),
         watch: (room) => request({ t: 'watch', room }, 'watching').then(remember),
         sendReact: (emoji) => send({ t: 'react', emoji }),
         onReact: (cb) => on('react', ({ emoji }) => cb(emoji)),
-        onStart: (cb) => on('start', ({ seed, names }) => cb({ seed, names })),
+        onStart: (cb) => on('start', ({ seed, names, avatars }) => cb({ seed, names, avatars })),
         sendThrow: ({ angle, power }) => send({ t: 'throw', angle, power }),
         onThrow: (cb) => on('throw', ({ angle, power }) => cb({ angle, power })),
         onLeft: (cb) => on('left', cb),

@@ -3,6 +3,19 @@ export const SITE_URL = 'https://codecon.digitalnyinovator.sk'
 export const HASHTAG = '#CodeconGulovacka'
 export const HITS_TO_WIN = 5
 export const LEADERBOARD_SIZE = 10
+
+// Postavičky na výber (sprity kreslí src/gfx/actors.js podľa id, náhľad v menu z avatarThumb)
+export const AVATARS = [
+  { id: 'boy', label: 'Chalan', emoji: '🧒' },
+  { id: 'girl', label: 'Dievča', emoji: '👧' },
+  { id: 'elf', label: 'Elf', emoji: '🧝' },
+  { id: 'robot', label: 'Robot', emoji: '🤖' },
+  { id: 'penguin', label: 'Tučniak', emoji: '🐧' },
+  { id: 'reindeer', label: 'Sob', emoji: '🦌' },
+]
+export const AVATAR_IDS = AVATARS.map((a) => a.id)
+export const DEFAULT_AVATARS = ['boy', 'robot'] // hráč vľavo, počítač
+export const avatarThumb = (id) => `/assets/avatars/${id}.webp`
 export const REACTIONS = ['🔥', '😂', '❄️', '🎅', '👏', '💀'] // emoji od fanúšikov (?watch=KOD)
 
 export const WORLD = { W: 1600, H: 900, GROUND_Y: 780 }

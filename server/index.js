@@ -3,7 +3,7 @@ import http from 'node:http'
 import { randomInt, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { WebSocketServer } from 'ws'
-import { HITS_TO_WIN, LEADERBOARD_SIZE, REACTIONS } from '../src/config.js'
+import { HITS_TO_WIN, LEADERBOARD_SIZE, REACTIONS, AVATAR_IDS, DEFAULT_AVATARS } from '../src/config.js'
 
 const PORT = process.env.PORT || 3000
 const DATA_DIR = new URL('./data/', import.meta.url)
@@ -103,6 +103,11 @@ setInterval(() => {
   const now = Date.now()
   for (const [ip, times] of recentByIp) if (!fresh(times, now).length) recentByIp.delete(ip)
 }, MINUTE).unref()
+const online = new Map() // id klienta → posledné hlásenie
+const ONLINE_TTL = 25_000
+const ONLINE_MAX = 50_000 // strop proti zahlteniu falošnými id
+const ONLINE_ID_RE = /^[a-z0-9]{8,32}$/
+
 const reject = (status, message) => {
   throw Object.assign(new Error(message), { status })
 }
@@ -152,6 +157,15 @@ const byRank = (a, b) =>
 const routes = {
   'GET /api/health': async () => ({ ok: true }),
 
+  // LIVE počet ľudí v appke: klient sa hlási každých ~10 s s náhodným id, po ONLINE_TTL vypadne
+  'GET /api/online': async (req, url) => {
+    const id = url.searchParams.get('id')
+    const now = Date.now()
+    if (ONLINE_ID_RE.test(id || '') && (online.has(id) || online.size < ONLINE_MAX)) online.set(id, now)
+    for (const [k, t] of online) if (now - t > ONLINE_TTL) online.delete(k)
+    return { n: online.size }
+  },
+
   'POST /api/entries': async (req) => {
     const body = await readBody(req)
     const error = validateEntry(body)
@@ -199,6 +213,8 @@ const wss = new WebSocketServer({ server, path: '/api/ws', maxPayload: MAX_BODY 
 
 const send = (ws, msg) => ws?.readyState === 1 && ws.send(JSON.stringify(msg))
 const cleanName = (n) => (typeof n === 'string' && n.trim().slice(0, MAX_LEN)) || 'Hráč'
+// avatar len z povoleného zoznamu, inak predvolený pre danú stranu
+const cleanAvatar = (a, side) => (AVATAR_IDS.includes(a) ? a : DEFAULT_AVATARS[side])
 
 function newCode() {
   let code
@@ -228,6 +244,7 @@ const handlers = {
     const room = newCode()
     const seed = randomInt(1e9)
     ws.name = cleanName(msg.name)
+    ws.avatar = cleanAvatar(msg.avatar, 0)
     ws.room = room
     rooms.set(room, { seed, players: [ws], fans: new Set() })
     send(ws, { t: 'created', room, seed, me: 0 })
@@ -239,11 +256,13 @@ const handlers = {
     if (!room || room.players.length !== 1 || room.players[0] === ws) return send(ws, { t: 'error', message: ROOM_ERROR })
     leave(ws)
     ws.name = cleanName(msg.name)
+    ws.avatar = cleanAvatar(msg.avatar, 1)
     ws.room = code
     room.players.push(ws)
     const names = room.players.map((p) => p.name)
-    send(ws, { t: 'joined', room: code, seed: room.seed, me: 1, names })
-    room.players.forEach((p) => send(p, { t: 'start', seed: room.seed, names }))
+    const avatars = room.players.map((p) => p.avatar)
+    send(ws, { t: 'joined', room: code, seed: room.seed, me: 1, names, avatars })
+    room.players.forEach((p) => send(p, { t: 'start', seed: room.seed, names, avatars }))
   },
 
   throw(ws, msg) {

@@ -18,7 +18,7 @@ const T = {
 const QR_SIZE = 280
 const DOTS = '<span class="lobby-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span>'
 
-export function showLobby(container, { name, room, onStart }) {
+export function showLobby(container, { name, avatar, room, onStart }) {
   container.innerHTML = `
     <div class="card lobby">
       <h2 class="title lobby-title">${TEXTS.modes.vs}</h2>
@@ -61,8 +61,8 @@ export function showLobby(container, { name, room, onStart }) {
   async function host() {
     setStatus(T.connecting, 'waiting')
     await open()
-    net.onStart(({ seed, names }) => go({ seed, me: 0, names }))
-    const { room: code } = await net.create(name)
+    net.onStart(({ seed, names, avatars }) => go({ seed, me: 0, names, avatars }))
+    const { room: code } = await net.create(name, avatar)
     const url = `${location.origin}/?room=${code}`
     body.innerHTML = `
       <div class="lobby-code" aria-label="Kód miestnosti">${code}</div>
@@ -82,8 +82,8 @@ export function showLobby(container, { name, room, onStart }) {
   async function guest() {
     setStatus(T.joining(room), 'waiting')
     await open()
-    const { seed, names } = await net.join(room, name)
-    go({ seed, me: 1, names })
+    const { seed, names, avatars } = await net.join(room, name, avatar)
+    go({ seed, me: 1, names, avatars })
   }
 
   ;(room ? guest : host)().catch(fail)

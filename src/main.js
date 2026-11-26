@@ -1,5 +1,5 @@
 import './style.css'
-import { TEXTS } from './config.js'
+import { TEXTS, AVATARS, AVATAR_IDS, DEFAULT_AVATARS, avatarThumb } from './config.js'
 import { startGame } from './game/game.js'
 import { showLobby } from './lobby.js'
 import { showResults } from './results.js'
@@ -44,6 +44,27 @@ function playerName() {
   return name
 }
 
+// Výber postavičky: náhľad z /assets/avatars/<id>.webp, ak chýba, ukáže sa emoji
+const picker = $('#avatars')
+let avatar = AVATAR_IDS.includes(localStorage.getItem('avatar')) ? localStorage.getItem('avatar') : DEFAULT_AVATARS[0]
+picker.innerHTML = AVATARS.map(
+  (a) => `<button type="button" class="avatar" data-avatar="${a.id}" role="radio" aria-label="${a.label}">
+    <img src="${avatarThumb(a.id)}" alt="" onerror="this.remove()"><span class="avatar-emoji">${a.emoji}</span>
+    <small>${a.label}</small></button>`,
+).join('')
+function selectAvatar(id) {
+  avatar = id
+  localStorage.setItem('avatar', id)
+  picker.querySelectorAll('.avatar').forEach((b) => b.setAttribute('aria-checked', String(b.dataset.avatar === id)))
+}
+selectAvatar(avatar)
+picker.addEventListener('click', (e) => {
+  const id = e.target.closest('[data-avatar]')?.dataset.avatar
+  if (id) selectAvatar(id)
+})
+// počítač dostane predvoleného súpera, ak si ho hráč nevybral sám
+const cpuAvatar = () => (avatar === DEFAULT_AVATARS[1] ? DEFAULT_AVATARS[0] : DEFAULT_AVATARS[1])
+
 let game = null
 let net = null
 let fans = null // emoji od fanúšikov (len VS)
@@ -77,6 +98,7 @@ function lobby(room) {
   showScreen('screen-lobby')
   showLobby($('#screen-lobby'), {
     name: playerName(),
+    avatar,
     room,
     onStart: (session) => {
       net = session.net
@@ -86,7 +108,14 @@ function lobby(room) {
 }
 
 const actions = {
-  cpu: () => play({ mode: 'cpu', seed: Math.floor(Math.random() * 1e9), me: 0, names: [playerName(), TEXTS.cpuName] }),
+  cpu: () =>
+    play({
+      mode: 'cpu',
+      seed: Math.floor(Math.random() * 1e9),
+      me: 0,
+      names: [playerName(), TEXTS.cpuName],
+      avatars: [avatar, cpuAvatar()],
+    }),
   vs: () => lobby(),
   join: () => {
     const room = roomInput.value.trim().toUpperCase()
