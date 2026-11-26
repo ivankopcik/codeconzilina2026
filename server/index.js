@@ -37,11 +37,7 @@ function addEntry(entry) {
   writeQueue = writeQueue.then(async () => {
     await mkdir(DATA_DIR, { recursive: true })
     const entries = await readEntries()
-    // jeden záznam na e-mail a režim, ponecháme ten lepší
-    const key = (e) => `${e.email.toLowerCase()}|${e.mode}`
-    const i = entries.findIndex((e) => key(e) === key(entry))
-    if (i < 0) entries.push(entry)
-    else if (byRank(entry, entries[i]) < 0) entries[i] = entry
+    entries.push(entry) // append-only, nič sa neprepisuje
     await writeFile(DATA_FILE, JSON.stringify(entries, null, 2))
   })
   return writeQueue
@@ -113,10 +109,12 @@ const routes = {
   'GET /api/leaderboard': async (req, url) => {
     const mode = url.searchParams.get('mode')
     if (!MODES.includes(mode)) throw Object.assign(new Error('Neplatný režim'), { status: 400 })
+    const seen = new Set() // v rebríčku len najlepší výsledok na e-mail
     const entries = await readEntries()
     return entries
       .filter((e) => e.mode === mode)
       .sort(byRank)
+      .filter((e) => !seen.has(e.email.toLowerCase()) && seen.add(e.email.toLowerCase()))
       .slice(0, 10)
       .map(({ name, score, accuracy, won, ts }) => ({ name, score, accuracy, won, ts }))
   },
