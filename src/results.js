@@ -1,5 +1,5 @@
 import './results.css'
-import { HASHTAG, SITE_URL, TEXTS, COLORS, HITS_TO_WIN } from './config.js'
+import { HASHTAG, SITE_URL, TEXTS, COLORS, HITS_TO_WIN, LEADERBOARD_SIZE } from './config.js'
 
 const CARD = { W: 1080, H: 1350 }
 const FILE_NAME = 'vianocna-gulovacka.png'
@@ -237,7 +237,7 @@ export function showResults(container, result, { onRestart } = {}) {
     try {
       const res = await fetch(`/api/leaderboard?mode=${encodeURIComponent(mode)}`)
       if (!res.ok) throw new Error(res.status)
-      const rows = (await res.json()).slice(0, 10)
+      const rows = (await res.json()).slice(0, LEADERBOARD_SIZE)
       html = rows.length
         ? `<table><thead><tr><th>#</th><th>Meno</th><th>Skóre</th><th>Presnosť</th><th>Výhra</th></tr></thead><tbody>
           ${rows.map((x, i) => `<tr><td>${MEDALS[i] || i + 1 + '.'}</td><td class="res-td-name">${esc(x.name)}</td>

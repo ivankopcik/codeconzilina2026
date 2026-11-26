@@ -4,6 +4,7 @@ import { render } from './render.js'
 import { simulateThrow, aimPreview, dirOf, STEPS_PER_S } from './physics.js'
 import { chooseThrow } from './ai.js'
 import { makeSnowmen, windForTurn } from './rng.js'
+import { sfx } from '../sfx.js'
 
 const DEG = Math.PI / 180
 const MAX_ANGLE = 85 * DEG
@@ -114,6 +115,7 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     state.phase = 'flying'
     state.aim = null
     state.players[shooter].lastThrowT = state.t
+    sfx('throw')
     if (shooter === me) myThrows++
   }
 
@@ -133,7 +135,10 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     flight = null
     state.ball = null
     state.trail = []
-    if (res.outcome !== 'out') state.effects.push({ type: res.outcome, x: res.at.x, y: res.at.y, age: 0 })
+    if (res.outcome !== 'out') {
+      state.effects.push({ type: res.outcome, x: res.at.x, y: res.at.y, age: 0 })
+      sfx(res.outcome)
+    }
     if (res.outcome === 'block') state.shake = Math.max(state.shake, BLOCK_SHAKE)
     if (res.outcome === 'hit') {
       state.players[shooter].hits++
@@ -142,6 +147,7 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
       if (state.players[shooter].hits >= HITS_TO_WIN) {
         state.phase = 'over'
         state.message = MSG.won(names[shooter])
+        sfx(shooter === me ? 'win' : 'lose')
         later(END_DELAY_MS, () => finish(shooter === me))
         return
       }

@@ -3,6 +3,7 @@ import { TEXTS } from './config.js'
 import { startGame } from './game/game.js'
 import { showLobby } from './lobby.js'
 import { showResults } from './results.js'
+import { sfx, music, toggleMute, isMuted } from './sfx.js'
 
 const $ = (sel) => document.querySelector(sel)
 const nameInput = $('#name')
@@ -12,6 +13,20 @@ const menu = $('#screen-menu')
 export function showScreen(id) {
   document.querySelectorAll('.screen').forEach((s) => s.classList.toggle('active', s.id === id))
 }
+
+// Zvuk: klik na tlačidlá + hudba po prvom geste, prepínač 🔊/🔇
+const muteBtn = $('#mute')
+const muteIcon = () => (muteBtn.textContent = isMuted() ? '🔇' : '🔊')
+muteIcon()
+muteBtn.addEventListener('click', () => {
+  toggleMute()
+  muteIcon()
+})
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.btn')) return
+  sfx('click')
+  music()
+})
 
 nameInput.value = localStorage.getItem('name') || ''
 function playerName() {

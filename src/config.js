@@ -2,6 +2,7 @@
 export const SITE_URL = 'https://codecon.digitalnyinovator.sk'
 export const HASHTAG = '#CodeconGulovacka'
 export const HITS_TO_WIN = 5
+export const LEADERBOARD_SIZE = 10
 
 export const WORLD = { W: 1600, H: 900, GROUND_Y: 780 }
 export const PLAYERS = [{ x: 170 }, { x: 1430 }] // 0 = vľavo, 1 = vpravo

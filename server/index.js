@@ -1,13 +1,15 @@
 // API pre Vianočnú guľovačku: WebSocket miestnosti (/api/ws) + REST súťaž a rebríček.
 import http from 'node:http'
 import { randomInt, randomUUID } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { WebSocketServer } from 'ws'
-import { HITS_TO_WIN } from '../src/config.js'
+import { HITS_TO_WIN, LEADERBOARD_SIZE } from '../src/config.js'
 
 const PORT = process.env.PORT || 3000
 const DATA_DIR = new URL('./data/', import.meta.url)
 const DATA_FILE = new URL('entries.json', DATA_DIR)
+const TMP_FILE = new URL('entries.json.tmp', DATA_DIR)
+const MAX_ENTRIES = 20000 // strop proti spamu, aby súbor a pamäť nerástli donekonečna
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'
 const MAX_BODY = 10 * 1024
 const MAX_LEN = 60
@@ -23,25 +25,33 @@ const sendJson = (res, status, data) => {
   res.end(JSON.stringify(data))
 }
 
-async function readEntries() {
+// Záznamy súťaže: v pamäti, append-only, na disk atomicky (tmp + rename).
+// Poškodený súbor sa nikdy neprepíše prázdnym poľom, odloží sa bokom na ručnú obnovu.
+async function loadEntries() {
   try {
-    return JSON.parse(await readFile(DATA_FILE, 'utf8'))
-  } catch {
-    return []
+    const data = JSON.parse(await readFile(DATA_FILE, 'utf8'))
+    if (Array.isArray(data)) return data
+  } catch (err) {
+    if (err.code === 'ENOENT') return []
   }
+  await rename(DATA_FILE, new URL(`entries.corrupt-${Date.now()}.json`, DATA_DIR)).catch(() => {})
+  console.error('entries.json bol poškodený, odložený bokom')
+  return []
 }
+const entries = await loadEntries()
 
-// Zápisy serializujeme, aby sa súbežné POSTy neprepísali.
-let writeQueue = Promise.resolve()
+let saving = Promise.resolve()
 function addEntry(entry) {
-  writeQueue = writeQueue.then(async () => {
+  entries.push(entry)
+  const write = saving.then(async () => {
     await mkdir(DATA_DIR, { recursive: true })
-    const entries = await readEntries()
-    entries.push(entry) // append-only, nič sa neprepisuje
-    await writeFile(DATA_FILE, JSON.stringify(entries, null, 2))
+    await writeFile(TMP_FILE, JSON.stringify(entries))
+    await rename(TMP_FILE, DATA_FILE)
   })
-  return writeQueue
+  saving = write.catch((err) => console.error('Zápis záznamov zlyhal', err)) // chyba nezablokuje ďalšie zápisy
+  return write
 }
+const emailKey = (e) => String(e.email ?? '').toLowerCase()
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -92,6 +102,7 @@ const routes = {
     const body = await readBody(req)
     const error = validateEntry(body)
     if (error) throw Object.assign(new Error(error), { status: 400 })
+    if (entries.length >= MAX_ENTRIES) throw Object.assign(new Error('Súťaž je plná'), { status: 503 })
     const entry = {
       id: randomUUID(),
       ts: Date.now(),
@@ -110,12 +121,11 @@ const routes = {
     const mode = url.searchParams.get('mode')
     if (!MODES.includes(mode)) throw Object.assign(new Error('Neplatný režim'), { status: 400 })
     const seen = new Set() // v rebríčku len najlepší výsledok na e-mail
-    const entries = await readEntries()
     return entries
       .filter((e) => e.mode === mode)
       .sort(byRank)
-      .filter((e) => !seen.has(e.email.toLowerCase()) && seen.add(e.email.toLowerCase()))
-      .slice(0, 10)
+      .filter((e) => !seen.has(emailKey(e)) && seen.add(emailKey(e)))
+      .slice(0, LEADERBOARD_SIZE)
       .map(({ name, score, accuracy, won, ts }) => ({ name, score, accuracy, won, ts }))
   },
 }
