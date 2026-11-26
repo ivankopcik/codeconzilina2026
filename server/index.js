@@ -3,7 +3,7 @@ import http from 'node:http'
 import { randomInt, randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { WebSocketServer } from 'ws'
-import { HITS_TO_WIN, LEADERBOARD_SIZE } from '../src/config.js'
+import { HITS_TO_WIN, LEADERBOARD_SIZE, REACTIONS } from '../src/config.js'
 
 const PORT = process.env.PORT || 3000
 const DATA_DIR = new URL('./data/', import.meta.url)
@@ -17,6 +17,7 @@ const MODES = ['cpu', 'vs']
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const HEARTBEAT_MS = 20000
 const ROOM_ERROR = 'Miestnosť neexistuje alebo je plná'
+const REACT_GAP_MS = 120 // anti-spam: max ~8 emoji/s na jeden socket
 
 // ---------- REST ----------
 
@@ -52,6 +53,23 @@ function addEntry(entry) {
   return write
 }
 const emailKey = (e) => String(e.email ?? '').toLowerCase()
+
+// Proti spamu: limit na IP za minútu (voľný, publikum je za jednou WiFi NAT) a strop na e-mail.
+// Port 3000 je za firewallom, X-Real-IP nastavuje len nginx.
+const IP_PER_MIN = 60
+const PER_EMAIL = 20
+const recentByIp = new Map()
+function tooManyFromIp(req) {
+  const ip = req.headers['x-real-ip'] || req.socket.remoteAddress
+  const now = Date.now()
+  const recent = (recentByIp.get(ip) || []).filter((t) => now - t < 60_000)
+  recent.push(now)
+  recentByIp.set(ip, recent)
+  return recent.length > IP_PER_MIN
+}
+const reject = (status, message) => {
+  throw Object.assign(new Error(message), { status })
+}
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -101,8 +119,10 @@ const routes = {
   'POST /api/entries': async (req) => {
     const body = await readBody(req)
     const error = validateEntry(body)
-    if (error) throw Object.assign(new Error(error), { status: 400 })
-    if (entries.length >= MAX_ENTRIES) throw Object.assign(new Error('Súťaž je plná'), { status: 503 })
+    if (error) reject(400, error)
+    if (tooManyFromIp(req)) reject(429, 'Príliš veľa pokusov, skús o chvíľu')
+    if (entries.filter((e) => emailKey(e) === emailKey(body)).length >= PER_EMAIL) reject(429, 'Z tohto e-mailu už máš dosť záznamov')
+    if (entries.length >= MAX_ENTRIES) reject(503, 'Súťaž je plná')
     const entry = {
       id: randomUUID(),
       ts: Date.now(),
@@ -158,6 +178,8 @@ function newCode() {
 }
 
 function leave(ws) {
+  rooms.get(ws.watching)?.fans.delete(ws)
+  ws.watching = null
   const room = rooms.get(ws.room)
   if (!room) return
   rooms.delete(ws.room)
@@ -166,6 +188,7 @@ function leave(ws) {
     p.room = null
     send(p, { t: 'left' })
   })
+  room.fans.forEach((f) => send(f, { t: 'left' }))
   ws.room = null
 }
 
@@ -176,7 +199,7 @@ const handlers = {
     const seed = randomInt(1e9)
     ws.name = cleanName(msg.name)
     ws.room = room
-    rooms.set(room, { seed, players: [ws] })
+    rooms.set(room, { seed, players: [ws], fans: new Set() })
     send(ws, { t: 'created', room, seed, me: 0 })
   },
 
@@ -199,6 +222,25 @@ const handlers = {
     const power = Number(msg.power)
     if (!room || !Number.isFinite(angle) || !Number.isFinite(power)) return
     room.players.forEach((p) => p !== ws && send(p, { t: 'throw', angle, power }))
+  },
+
+  // Fanúšikovia: pripoja sa k miestnosti cez ?watch=KOD a posielajú emoji na pódiovú obrazovku
+  watch(ws, msg) {
+    const code = String(msg.room || '').trim().toUpperCase()
+    const room = rooms.get(code)
+    if (!room) return send(ws, { t: 'error', message: ROOM_ERROR })
+    leave(ws)
+    ws.watching = code
+    room.fans.add(ws)
+    send(ws, { t: 'watching', room: code })
+  },
+
+  react(ws, msg) {
+    const room = rooms.get(ws.room || ws.watching)
+    const now = Date.now()
+    if (!room || !REACTIONS.includes(msg.emoji) || now - (ws.reactAt || 0) < REACT_GAP_MS) return
+    ws.reactAt = now
+    ;[...room.players, ...room.fans].forEach((p) => send(p, { t: 'react', emoji: msg.emoji }))
   },
 }
 

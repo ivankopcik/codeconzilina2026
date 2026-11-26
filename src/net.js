@@ -4,7 +4,7 @@ const WS_URL = () => `${location.protocol === 'https:' ? 'wss' : 'ws'}://${locat
 export function connect() {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(WS_URL())
-    const listeners = { created: [], joined: [], error: [], start: [], throw: [], left: [] }
+    const listeners = { created: [], joined: [], watching: [], error: [], start: [], throw: [], react: [], left: [] }
     const on = (t, cb) => listeners[t].push(cb)
     const emit = (t, msg) => listeners[t]?.forEach((cb) => cb(msg))
     const send = (msg) => ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(msg))
@@ -46,10 +46,16 @@ export function connect() {
     })
     ws.addEventListener('close', fireLeft)
     ws.addEventListener('error', () => reject(new Error('Nepodarilo sa pripojiť k serveru')))
+    // kód miestnosti si pamätáme v net.room (QR pre fanúšikov na hernej obrazovke)
+    const remember = (data) => ((api.room = data.room), data)
+    const api = {}
     ws.addEventListener('open', () =>
-      resolve({
-        create: (name) => request({ t: 'create', name }, 'created'),
-        join: (room, name) => request({ t: 'join', room, name }, 'joined'),
+      resolve(Object.assign(api, {
+        create: (name) => request({ t: 'create', name }, 'created').then(remember),
+        join: (room, name) => request({ t: 'join', room, name }, 'joined').then(remember),
+        watch: (room) => request({ t: 'watch', room }, 'watching').then(remember),
+        sendReact: (emoji) => send({ t: 'react', emoji }),
+        onReact: (cb) => on('react', ({ emoji }) => cb(emoji)),
         onStart: (cb) => on('start', ({ seed, names }) => cb({ seed, names })),
         sendThrow: ({ angle, power }) => send({ t: 'throw', angle, power }),
         onThrow: (cb) => on('throw', ({ angle, power }) => cb({ angle, power })),

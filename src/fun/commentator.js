@@ -1,0 +1,191 @@
+import './commentator.css'
+
+// Komentátor zápasu „Mrázik“: roast hlášky ako bublina + voliteľne TTS.
+const LINES = {
+  start: [
+    'Vitajte v Novej synagóge! {n} proti {o}, sneh je pripravený!',
+    '{n} verzus {o}. Takú bitku Žilina nevidela od Jánošíka!',
+    'Dámy a páni, guľovačka roka! {n} a {o} na ihrisku!',
+    '{n} sa rozcvičuje, {o} ešte hľadá rukavice.',
+    'Mrázik hlási: vietor z Malej Fatry, nálada ako na CODECONe!',
+    '{n} proti {o}. Kto prehrá, deployuje v piatok!',
+    'Štart! {n} a {o}, nech lietajú gule, nie bugy!',
+  ],
+  hit: [
+    'BUM! {n} trafil {o} ako bug v produkcii!',
+    'Zásah! {o} teraz vyzerá ako snehuliak z Terchovej!',
+    '{n} mieri lepšie než Jánošík valaškou!',
+    'Priamy zásah! {o}, to bude bolieť až do Silvestra.',
+    '{o} to schytal rovno do čiapky s brmbolcom!',
+    'Headshot! {n} mieri presnejšie ako AI autocomplete.',
+    'Ajaj, {o}! Ten sneh ti ide do commit histórie.',
+    'Perfektný hod! {n} by trafil aj vrchol Chleba.',
+  ],
+  cpuHit: [
+    'Počítač trafil {o}. AI ti berie prácu aj v guľovačke!',
+    'Skynet sa prebudil a začal snehovými guľami.',
+    'Umelá inteligencia 1, prirodzená hlúposť 0.',
+    '{o}, toto je ten moment, keď sa AI učí z tvojich chýb.',
+    'Počítač hlási: zásah. Ďalší krok: ovládnutie Žiliny.',
+    'GPU zohriate, {o} zasnežený. Pokrok nezastavíš!',
+    'Robot trafil. {o}, skús sa mu ospravedlniť vopred.',
+  ],
+  block: [
+    'Snehuliak to schytal! Hrdina dňa, bez platu.',
+    'Snehuliak zachránil {o}. Dajte mu mrkvu navyše!',
+    '{n} trafil snehuliaka. Aspoň niekto dnes dostal bod… nie.',
+    'Snehuliak: jediný tester, ktorý reálne zachytil chybu.',
+    'Firewall zo snehu funguje! {o} je v bezpečí.',
+    'Snehuliak bráni ako Jánošík svoju družinu!',
+    '{n}, snehuliak ti nič neurobil. Zatiaľ.',
+  ],
+  splash: [
+    '{n} trafil zem. Sneh je spokojný, {o} tiež.',
+    'Pľuf! Do snehu, ako pull request bez review.',
+    '{n}, cieľ je {o}, nie podlaha!',
+    'Krásny hod… do záveja. Aj tak sa ráta snaha.',
+    'Guľa pristála skôr ako deadline. To je novinka.',
+    '{n} zalieva trávnik snehom. Ekologické!',
+    'Zem trafená na sto percent. Aspoň niečo.',
+  ],
+  out: [
+    '{n} hodil guľu rovno do Martina!',
+    'Tá guľa letí na Malú Fatru. Pošlite záchranku!',
+    'Guľa opustila mapu. Aj Žilinu. Aj Slovensko.',
+    '{n} si spletol {o} s Terchovou.',
+    'Ďakujeme za hod, guľa je teraz v cloude.',
+    'Wow, {n}! Tá guľa ide doručiť darčeky do Laponska.',
+    'Hod out of bounds. Ako index v poli o jedna vedľa.',
+  ],
+  matchpoint: [
+    '{n} má štyri zásahy! Ešte jedna… FINISH HIM!',
+    'Matchball pre {n}! {o}, modli sa k Mrázikovi!',
+    'Štyri na tabuli! {n}, dokonči to!',
+    '{o} visí na vlásku! Ešte jedna guľa a koniec!',
+    '{n} je jeden zásah od slávy. FINISH HIM!',
+    'Napätie ako pred piatkovým deployom! {n} má štyri!',
+  ],
+  win: [
+    'K.O.! {n} vyhráva! FATALITY!',
+    '{n} WINS! {o}, choď sa zohriať na punč.',
+    'FATALITY! {o} je oficiálne snehuliak.',
+    'Koniec! {n} je kráľ guľovačky v Novej synagóge!',
+    '{n} vyhral! Jánošík by bol hrdý.',
+    'FLAWLESS VICTORY! Alebo aspoň victory. {n} vyhráva!',
+    'K.O.! {o}, nabudúce skús Ctrl+Z.',
+  ],
+}
+
+const EMOJI_RE = /\p{Extended_Pictographic}/gu
+const SHOW_MS = 3500
+const LS_KEY = 'tts'
+
+function lsGet() {
+  try { return localStorage.getItem(LS_KEY) } catch { return null }
+}
+function lsSet(v) {
+  try { localStorage.setItem(LS_KEY, v) } catch {}
+}
+
+export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'], me = 0, mode = 'cpu' } = {}) {
+  const synth = typeof window !== 'undefined' ? window.speechSynthesis : null
+  const stored = lsGet()
+  let ttsOn = stored != null ? stored === '1' : !!window.matchMedia?.('(pointer: fine)').matches
+  let voice // undefined = ešte nehľadaný, null = nenájdený
+  let hideTimer = 0
+  const lastIdx = {}
+
+  const root = document.createElement('div')
+  root.className = 'cm-root'
+  root.innerHTML = `
+    <div class="cm-bubble" hidden><div class="cm-label">🎙️ Mrázik</div><div class="cm-text"></div></div>
+    <button class="cm-tts" type="button"></button>`
+  const bubble = root.querySelector('.cm-bubble')
+  const textEl = root.querySelector('.cm-text')
+  const btn = root.querySelector('.cm-tts')
+  container.appendChild(root)
+
+  const renderBtn = () => {
+    btn.textContent = ttsOn ? '🔊' : '🔇'
+    btn.setAttribute('aria-label', ttsOn ? 'Vypnúť hlas komentátora' : 'Zapnúť hlas komentátora')
+  }
+  renderBtn()
+  if (!synth) btn.hidden = true
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation()
+    ttsOn = !ttsOn
+    lsSet(ttsOn ? '1' : '0')
+    if (!ttsOn) synth?.cancel()
+    renderBtn()
+  })
+  btn.addEventListener('pointerdown', (e) => e.stopPropagation())
+
+  // iOS: speech sa musí odomknúť v rámci user gesta
+  const unlock = () => {
+    try { synth?.speak(new SpeechSynthesisUtterance('')) } catch {}
+  }
+  window.addEventListener('pointerdown', unlock, { once: true })
+
+  function pickVoice() {
+    if (voice) return voice
+    const voices = synth?.getVoices() || []
+    voice = voices.find((v) => /^sk/i.test(v.lang)) || voices.find((v) => /^cs/i.test(v.lang)) || null
+    return voice
+  }
+
+  function speak(text) {
+    if (!ttsOn || !synth) return
+    const v = pickVoice()
+    if (!v) return
+    const clean = text.replace(EMOJI_RE, '').replace(/\s+/g, ' ').trim()
+    if (!clean) return
+    synth.cancel()
+    const u = new SpeechSynthesisUtterance(clean)
+    u.voice = v
+    u.lang = v.lang
+    u.rate = 1.05
+    synth.speak(u)
+  }
+
+  function pick(cat) {
+    const list = LINES[cat]
+    let i = Math.floor(Math.random() * list.length)
+    if (list.length > 1 && i === lastIdx[cat]) i = (i + 1) % list.length
+    lastIdx[cat] = i
+    return list[i]
+  }
+
+  function say(type, { shooter } = {}) {
+    if (!LINES[type]) return
+    const s = type === 'start' || shooter == null ? 0 : shooter
+    let cat = type
+    if (type === 'hit' && mode === 'cpu' && s !== me && Math.random() < 0.5) cat = 'cpuHit'
+    const text = pick(cat)
+      .replaceAll('{n}', names[s] ?? '')
+      .replaceAll('{o}', names[1 - s] ?? '')
+
+    textEl.textContent = text
+    bubble.hidden = false
+    // reštart animácie
+    bubble.classList.remove('cm-show')
+    void bubble.offsetWidth
+    bubble.classList.add('cm-show')
+    clearTimeout(hideTimer)
+    hideTimer = setTimeout(() => {
+      bubble.classList.remove('cm-show')
+      bubble.hidden = true
+    }, SHOW_MS)
+
+    speak(text)
+  }
+
+  function destroy() {
+    clearTimeout(hideTimer)
+    window.removeEventListener('pointerdown', unlock)
+    synth?.cancel()
+    root.remove()
+  }
+
+  return { say, destroy }
+}
