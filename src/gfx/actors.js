@@ -1,7 +1,7 @@
 // Postavy: hráči (AI sprity alebo procedurálna náhrada) a snehuliaci, animácie, menovky, šípka ťahu.
 import { WORLD, COLORS, HITS_TO_WIN } from '../config.js'
-import { asset } from './assets.js'
-import { makeCanvas, circle, rrect, poly, glow, groundShadow, pillLabel, starPath, short, dirOf, TAU } from './util.js'
+import { asset, spriteAt } from './assets.js'
+import { makeCanvas, circle, rrect, poly, glow, groundShadow, pillLabel, starPath, short, dirOf, clamp, TAU } from './util.js'
 
 const { GROUND_Y } = WORLD
 export const PLAYER_H = 210
@@ -12,6 +12,43 @@ const HIT_T = 0.8
 const SNOWMAN_HAT = 0.16 // podiel klobúka na výške spritu snehuliaka (trčí nad kolíznymi kruhmi)
 const SPRITE_FACING = { p0: 1, p1: -1, cpu: -1 } // kam sa pozerá AI obrázok
 const FLASH = ['#ff3b4f', '#ffffff']
+
+// --- avatary: AI pózy (Higgsfield) v /assets/avatars/<id>/<póza>.webp, všetky otočené doprava ---
+const POSES = ['idle', 'windup', 'throw', 'hit', 'win']
+const POSE_H = { win: 1.12 } // víťazná póza má ruky hore, sprite je vyšší
+const THROW_POSE_T = 0.5
+const HIT_POSE_T = 0.9
+const POP_T = 0.18
+const LEGACY = { boy: 'p0', elf: 'p1', robot: 'cpu' }
+const avatarOf = (s, i) => s.players[i].avatar || (i === 0 ? 'boy' : s.mode === 'cpu' ? 'robot' : 'elf')
+const poseSrc = (id, pose) => `/assets/avatars/${id}/${pose}.webp`
+
+function poseOf(s, i) {
+  const p = s.players[i]
+  if (s.phase === 'over') return p.hits >= HITS_TO_WIN ? 'win' : s.players[1 - i].hits >= HITS_TO_WIN ? 'hit' : 'idle'
+  const tHit = s.t - p.lastHitT
+  const tThrow = s.t - p.lastThrowT
+  if (tHit >= 0 && tHit < HIT_POSE_T) return 'hit'
+  if (tThrow >= 0 && tThrow < THROW_POSE_T) return 'throw'
+  if (s.turn === i && (s.phase === 'aim' || s.phase === 'wait')) return 'windup'
+  return 'idle'
+}
+
+function avatarSprite(id, pose) {
+  POSES.forEach((ps) => spriteAt(poseSrc(id, ps))) // prednačítanie všetkých póz avatara
+  return spriteAt(poseSrc(id, pose)) || spriteAt(poseSrc(id, 'windup'))
+}
+
+// Pri zmene pózy krátke „pop“ (squash & stretch), nech prechod nepôsobí ako skok
+const poseMem = [{}, {}]
+function posePop(s, i, pose) {
+  const m = poseMem[i]
+  if (m.pose !== pose) {
+    m.pose = pose
+    m.t = s.t
+  }
+  return clamp(1 - (s.t - m.t) / POP_T, 0, 1)
+}
 
 // --- procedurálna náhrada postavičky (otočená doprava, nohy dole v strede) ---
 const LOOKS = {
@@ -94,6 +131,16 @@ function tinted(src, color) {
 
 const spriteKind = (s, i) => (i === 0 ? 'p0' : s.mode === 'cpu' ? 'cpu' : 'p1')
 
+// Póza avatara → starý sprite (boy/elf/robot) → procedurálna náhrada
+function pickSprite(s, i, pose, facing) {
+  const id = avatarOf(s, i)
+  const av = avatarSprite(id, pose)
+  if (av) return { spr: av, flip: facing }
+  const kind = LEGACY[id] || spriteKind(s, i)
+  const real = asset(kind)
+  return { spr: real || fallback(kind), flip: facing * (real ? SPRITE_FACING[kind] : 1) }
+}
+
 function drawDizzy(ctx, x, y, t, k) {
   ctx.globalAlpha = k
   for (let j = 0; j < 3; j++) {
@@ -119,12 +166,11 @@ function turnArrow(ctx, x, y, t) {
 
 export function drawPlayer(ctx, s, i) {
   const p = s.players[i]
-  const kind = spriteKind(s, i)
-  const real = asset(kind)
-  const spr = real || fallback(kind)
   const facing = dirOf(i)
-  const flip = facing * (real ? SPRITE_FACING[kind] : 1)
-  const h = PLAYER_H
+  const pose = poseOf(s, i)
+  const { spr, flip } = pickSprite(s, i, pose, facing)
+  const pop = posePop(s, i, pose)
+  const h = PLAYER_H * (POSE_H[pose] || 1)
   const w = (h * spr.w) / spr.h
   const color = COLORS.players[i]
   const active = s.turn === i && s.phase !== 'over'
@@ -133,8 +179,8 @@ export function drawPlayer(ctx, s, i) {
 
   // dýchanie, hod, zásah, víťazné skákanie
   const breathe = Math.sin(s.t * 2.6 + i * 1.7)
-  let sx = 1 - breathe * 0.012
-  let sy = 1 + breathe * 0.02
+  let sx = (1 - breathe * 0.012) * (1 + 0.1 * pop)
+  let sy = (1 + breathe * 0.02) * (1 - 0.1 * pop)
   let rot = 0
   let ox = 0
   let oy = 0

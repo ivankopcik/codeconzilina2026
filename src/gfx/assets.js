@@ -110,6 +110,25 @@ if (browser) {
 
 export const asset = (key) => loaded[key] || null
 
+// Sprity avatarov (pózy) sa načítajú lenivo podľa cesty – len pre avatary, ktoré sú práve v hre
+const lazy = {}
+export function spriteAt(src) {
+  let e = lazy[src]
+  if (!e) {
+    e = lazy[src] = { v: null }
+    if (browser) {
+      const img = new Image()
+      img.decoding = 'async'
+      img.onload = () => {
+        const c = prepSprite(img)
+        e.v = { img: c, w: c.width, h: c.height }
+      }
+      img.src = src
+    }
+  }
+  return e.v
+}
+
 // Aktuálny frame videa, ak sa dá kresliť
 export function bgVideo() {
   const v = video

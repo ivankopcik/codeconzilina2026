@@ -1,5 +1,5 @@
 // Herná slučka: ťahy, vstup (prak + klávesnica), CPU, online synchronizácia, škálovanie canvasu.
-import { WORLD, PLAYERS, HITS_TO_WIN, COLORS } from '../config.js'
+import { WORLD, PLAYERS, HITS_TO_WIN, COLORS, DEFAULT_AVATARS } from '../config.js'
 import { render } from './render.js'
 import { simulateThrow, aimPreview, dirOf, STEPS_PER_S } from './physics.js'
 import { chooseThrow } from './ai.js'
@@ -23,6 +23,8 @@ const BLOCK_SHAKE = 0.35
 const TRAIL_LEN = 36
 const TRAIL_EVERY = 3
 const LONG_AGO = -100
+const COMBO_MIN = 2 // kombo = toľko zásahov za sebou (Mortal Kombat štýl)
+const SFX_AS_HIT = ['matchpoint', 'combo', 'brutality', 'breaker']
 const KO_SPEED = 0.25 // K.O. slow-mo: rýchlosť animácie pri poslednom zásahu (fyzika sa nemení)
 const KO_STEPS = 72 // koľko krokov dráhy pred dopadom ide spomalene (~0.6 s)
 const SLOWMO_DECAY = 0.8
@@ -37,7 +39,7 @@ const MSG = {
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
 
-export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
+export function startGame({ canvas, mode, seed, me, names, avatars, net, onEnd }) {
   const ctx = canvas.getContext('2d')
   const startedAt = performance.now()
   const timers = new Set()
@@ -54,6 +56,7 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
   let usingKeys = false
   let keyAim = { angle: 45 * DEG, power: 0.6 }
   let myThrows = 0
+  const streak = [0, 0] // zásahy za sebou pre každého hráča
 
   const state = {
     t: 0,
@@ -62,7 +65,7 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     turn: 0,
     phase: 'wait',
     message: '',
-    players: PLAYERS.map((p, i) => ({ x: p.x, name: names[i], hits: 0, lastThrowT: LONG_AGO, lastHitT: LONG_AGO })),
+    players: PLAYERS.map((p, i) => ({ x: p.x, name: names[i], avatar: avatars?.[i] || DEFAULT_AVATARS[i], hits: 0, lastThrowT: LONG_AGO, lastHitT: LONG_AGO })),
     snowmen: makeSnowmen(seed),
     ball: null,
     trail: [],
@@ -76,7 +79,7 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
   // Herné udalosti: zvuk (GRAFIKA) + komentátor Mrázik. Typy: start|throw|hit|block|splash|out|matchpoint|win|lose
   const commentator = createCommentator(canvas.parentElement, { names, me, mode })
   function emit(type, data = {}) {
-    sfx(type === 'matchpoint' ? 'hit' : type)
+    sfx(SFX_AS_HIT.includes(type) ? 'hit' : type)
     commentator.say(type === 'lose' ? 'win' : type, data)
   }
 
@@ -147,7 +150,13 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
     state.trail = []
     if (res.outcome !== 'out') state.effects.push({ type: res.outcome, x: res.at.x, y: res.at.y, age: 0 })
     if (res.outcome === 'block') state.shake = Math.max(state.shake, BLOCK_SHAKE)
-    if (res.outcome === 'hit') {
+    // Kombo: zásahy toho istého hráča za sebou; zásah súpera s rozbehnutým kombom = COMBO BREAKER
+    const hit = res.outcome === 'hit'
+    const breaker = hit && streak[1 - shooter] >= COMBO_MIN
+    if (hit) streak[1 - shooter] = 0
+    streak[shooter] = hit ? streak[shooter] + 1 : 0
+    const info = { shooter, combo: streak[shooter] >= COMBO_MIN ? streak[shooter] : 0, breaker }
+    if (hit) {
       state.players[shooter].hits++
       state.players[1 - shooter].lastHitT = state.t // čas, kedy bol hráč zasiahnutý
       state.shake = 1
@@ -155,13 +164,19 @@ export function startGame({ canvas, mode, seed, me, names, net, onEnd }) {
         state.phase = 'over'
         state.message = MSG.won(names[shooter])
         sfx('hit')
-        emit(shooter === me ? 'win' : 'lose', { shooter })
+        emit(shooter === me ? 'win' : 'lose', info)
         later(END_DELAY_MS, () => finish(shooter === me))
         return
       }
     }
     const hits = state.players[shooter].hits
-    emit(res.outcome === 'hit' && hits === HITS_TO_WIN - 1 ? 'matchpoint' : res.outcome, { shooter })
+    const type = !hit ? res.outcome
+      : hits === HITS_TO_WIN - 1 ? 'matchpoint'
+      : breaker ? 'breaker'
+      : info.combo > COMBO_MIN ? 'brutality'
+      : info.combo ? 'combo'
+      : 'hit'
+    emit(type, info)
     state.phase = 'wait'
     later(NEXT_TURN_MS, () => {
       turnNo++

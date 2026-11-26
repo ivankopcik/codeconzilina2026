@@ -5,8 +5,13 @@ Prehliadačová hra z AI Battle na CODECON Žilina 2026. Dvaja hráči sa stried
 **Hraj:** https://codecon.digitalnyinovator.sk
 
 - hra proti počítaču aj online VS (pozvánka cez QR kód)
-- výsledky na zdieľanie (karta pre Instagram s `#CodeconGulovacka`) a súťaž cez e-mail
+- výber postavičky, vietor, fujavica, snehuliaci ako prekážky
+- komentátor Mrázik s hlasom (ElevenLabs), kombá, K.O. slow-mo
+- fanúšikovia cez QR posielajú emoji reakcie počas VS, LIVE počet ľudí online
+- výsledky na zdieľanie na Instagram a Facebook s `#CodeconGulovacka` a súťaž cez e-mail
 - rebríček zvlášť pre hru proti počítaču a pre VS
+
+Postavené za 30 minút v AI Battle tímom Claude sessions: manager (architektúra, server, integrácia, deploy) s paralelnými agentmi HRA, ONLINE a VÝSLEDKY, grafik (scéna, postavičky, AI obrázky a videá), fun-factor (komentátor, emoji fanúšikov, kombá) a QA session.
 
 ## Spustenie lokálne
 

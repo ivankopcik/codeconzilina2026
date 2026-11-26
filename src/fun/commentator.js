@@ -76,6 +76,20 @@ const LINES = {
     'FLAWLESS VICTORY! Alebo aspoň victory. {n} vyhráva!',
     'K.O.! {o}, nabudúce skús Ctrl+Z.',
   ],
+  combo: [
+    'KOMBO! {n} trafil dvakrát za sebou!',
+    '{n} sa rozbehol! {o} nestíha uhýbať.',
+    'Dva zásahy v rade! {n} je v ráži!',
+  ],
+  brutality: [
+    'BRUTALITY! {n} rozoberá {o} na snehové vločky!',
+    '{n} nepozná zľutovanie! BRUTALITY!',
+    'Séria pokračuje! {o} potrebuje lopatu.',
+  ],
+  breaker: [
+    'COMBO BREAKER! {n} zastavil sériu {o}!',
+    '{n} prerušil kombo! {o} ide späť na nulu.',
+  ],
 }
 
 // Nahrávky hlasom Ivana Kopčíka (ElevenLabs eleven_v4), text v bubline = presne to, čo znie
@@ -88,9 +102,13 @@ const VOICE = {
   out: [['out1', 'Tá guľa letí na Malú Fatru! Pošlite záchranku!'], ['out2', 'Ďakujeme za hod, guľa je teraz v cloude.']],
   matchpoint: [['matchpoint1', 'Štyri na tabuli! Ešte jedna… FINISH HIM!']],
   win: [['win1', 'K.O.! Máme víťaza! FATALITY!']],
+  combo: [['combo1', 'Dva zásahy za sebou! KOMBO!'], ['combo2', 'KOMBO! Ide to ako po masle!']],
+  brutality: [['brutality1', 'Tri zásahy za sebou! BRUTALITY!']],
+  breaker: [['breaker1', 'COMBO BREAKER! Séria je fuč!']],
 }
 const VOICE_CHANCE = 0.6 // inak textová hláška s menami (bez zvuku)
-const VOICE_ALWAYS = ['start', 'matchpoint', 'win']
+const VOICE_ALWAYS = ['start', 'matchpoint', 'win', 'combo', 'brutality', 'breaker']
+const COMBO_MS = 1900
 const clips = {} // načítané až po prvom geste (autoplay policy)
 let playing = null // nová hláška preruší starú
 
@@ -140,8 +158,23 @@ export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'],
   const root = document.createElement('div')
   root.className = 'cm-root'
   root.innerHTML = `
-    <div class="cm-bubble" hidden><div class="cm-label">🎙️ Mrázik</div><div class="cm-text"></div></div>`
+    <div class="cm-bubble" hidden><div class="cm-label">🎙️ Mrázik</div><div class="cm-text"></div></div>
+    <div class="cm-combo" hidden><b></b><span></span><i></i></div>`
   const bubble = root.querySelector('.cm-bubble')
+  const comboEl = root.querySelector('.cm-combo')
+  let comboTimer = 0
+
+  // Mortal Kombat banner na strane strelca: „3 HIT COMBO! BRUTALITY!“ / „COMBO BREAKER!“
+  function showCombo(shooter, combo, breaker) {
+    const [top, mid, low] = breaker ? ['COMBO', 'BREAKER!', ''] : [`${combo} HIT`, 'COMBO!', combo > 2 ? 'BRUTALITY!' : '']
+    ;[...comboEl.children].forEach((el, i) => (el.textContent = [top, mid, low][i]))
+    comboEl.className = `cm-combo p${shooter}`
+    comboEl.hidden = false
+    void comboEl.offsetWidth
+    comboEl.classList.add('cm-slam')
+    clearTimeout(comboTimer)
+    comboTimer = setTimeout(() => (comboEl.hidden = true), COMBO_MS)
+  }
   const textEl = root.querySelector('.cm-text')
   container.appendChild(root)
 
@@ -182,9 +215,10 @@ export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'],
     return list[i]
   }
 
-  function say(type, { shooter } = {}) {
+  function say(type, { shooter, combo = 0, breaker = false } = {}) {
     if (!LINES[type]) return
     const s = type === 'start' || shooter == null ? 0 : shooter
+    if (combo || breaker) showCombo(s, combo, breaker)
     let cat = type
     if (type === 'hit' && mode === 'cpu' && s !== me && Math.random() < 0.5) cat = 'cpuHit'
     const voiced = VOICE[cat] && !isMuted() && (VOICE_ALWAYS.includes(cat) || Math.random() < VOICE_CHANCE)
@@ -211,6 +245,7 @@ export function createCommentator(container, { names = ['Hráč 1', 'Hráč 2'],
 
   function destroy() {
     clearTimeout(hideTimer)
+    clearTimeout(comboTimer)
     window.removeEventListener('pointerdown', unlock)
     root.remove() // reč nerušíme, nech K.O. hláška dobehne aj na obrazovke výsledkov
   }
