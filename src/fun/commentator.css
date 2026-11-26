@@ -68,3 +68,13 @@
   0% { opacity: 0; transform: translateX(-50%) scale(0.6); }
   100% { opacity: 1; transform: translateX(-50%) scale(1); }
 }
+
+/* TTS je vypnutý (robotický hlas), prepínač hlasu skryjeme */
+.cm-tts { display: none; }
+
+/* mobil na šírku: menšia bublina, aby neprekrývala hráča a zem */
+@media (max-height: 500px) {
+  .cm-bubble { bottom: 1vh; padding: 4px 14px; max-width: 62vw; }
+  .cm-label { display: none; }
+  .cm-text { font-size: 13px; line-height: 1.25; }
+}
