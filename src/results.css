@@ -87,3 +87,7 @@
 .res-table td:last-child { color: var(--accent-2); font-weight: 900; }
 
 .res-restart { font-size: 1.35rem; padding: 18px; }
+
+/* zdieľanie na sociálne siete */
+.res-actions .res-ig { background: linear-gradient(45deg, #f58529, #dd2a7b 50%, #8134af); border: none; }
+.res-actions .res-fb { background: #1877f2; border: none; }

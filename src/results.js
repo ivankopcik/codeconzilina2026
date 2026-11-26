@@ -9,10 +9,14 @@ const HOST = SITE_URL.replace(/^https?:\/\//, '')
 const EVENT = 'CODECON Žilina 2026'
 
 const ACTIONS = [
-  { id: 'share', label: '📲 Zdieľať', primary: true },
+  { id: 'instagram', label: '📸 Instagram', cls: 'res-ig' },
+  { id: 'facebook', label: '📘 Facebook', cls: 'res-fb' },
+  { id: 'share', label: '📲 Iné appky' },
   { id: 'download', label: '⬇️ Stiahnuť obrázok' },
   { id: 'copy', label: '📋 Kopírovať text' },
 ]
+const FB_SHARER = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(SITE_URL)}&hashtag=${encodeURIComponent(HASHTAG)}`
+const IG_WEB = 'https://www.instagram.com/'
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const pct = (a) => `${Math.round((a || 0) * 100)} %`
@@ -143,7 +147,7 @@ export function showResults(container, result, { onRestart } = {}) {
 
     <img class="res-preview" alt="Karta s výsledkom na zdieľanie">
     <div class="res-actions">
-      ${ACTIONS.map((a) => `<button class="btn ${a.primary ? 'btn-primary' : ''}" data-act="${a.id}">${a.label}</button>`).join('')}
+      ${ACTIONS.map((a) => `<button class="btn ${a.cls || ''}" data-act="${a.id}">${a.label}</button>`).join('')}
     </div>
     <p class="res-msg" aria-live="polite"></p>
     <p class="res-info">Zdieľaj kartu na Instagrame s <b>${HASHTAG}</b> alebo sa zapoj e-mailom a vyhraj poukážky na elektroniku, merch alebo VIP kreslo na ďalšom CODECONe!</p>
@@ -179,43 +183,55 @@ export function showResults(container, result, { onRestart } = {}) {
   }
 
   // karta – prekresli po načítaní fontu
+  // karta aj PNG súbor sa pripravia vopred, aby share bežal synchrónne v kliknutí (iOS Safari inak zablokuje)
   let canvas = drawCard(r, v)
-  const preview = () => ($('.res-preview').src = canvas.toDataURL('image/png'))
-  preview()
+  let file = null
+  const prepare = () => {
+    $('.res-preview').src = canvas.toDataURL('image/png')
+    canvas.toBlob((b) => (file = new File([b], FILE_NAME, { type: 'image/png' })), 'image/png')
+  }
+  prepare()
   document.fonts?.ready.then(() => {
     canvas = drawCard(r, v)
-    preview()
+    prepare()
   })
 
   const text = shareText(r, v)
   const download = () => Object.assign(document.createElement('a'), { href: canvas.toDataURL('image/png'), download: FILE_NAME }).click()
+  const copyText = () => navigator.clipboard?.writeText(text).then(() => true, () => false) ?? Promise.resolve(false)
+  const canShareFile = () => file && navigator.canShare?.({ files: [file] })
+  // natívne zdieľanie obrázka (mobil → výber appky), inak stiahnutie
+  const shareImage = (withText) =>
+    canShareFile()
+      ? navigator.share(withText ? { files: [file], text } : { files: [file] }).catch((e) => e.name !== 'AbortError' && download())
+      : (download(), false)
 
   const actions = {
-    async share() {
-      const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'))
-      const files = [new File([blob], FILE_NAME, { type: 'image/png' })]
-      if (navigator.canShare?.({ files })) {
-        try {
-          await navigator.share({ files, text })
-        } catch (e) {
-          if (e.name !== 'AbortError') download()
-        }
-      } else {
-        download()
-        flash(`Obrázok stiahnutý – pridaj ho na Instagram s ${HASHTAG} 📸`)
-      }
+    // Instagram nevie prijať text z webu: popis s hashtagom dáme do schránky, obrázok cez share sheet
+    async instagram() {
+      const copied = copyText()
+      const shared = shareImage(false)
+      if (shared === false) window.open(IG_WEB, '_blank', 'noopener')
+      flash(
+        (await copied)
+          ? `📸 Popis s ${HASHTAG} je v schránke, v Instagrame ho vlož do popisku (podrž → Vložiť)`
+          : `📸 Pridaj obrázok na Instagram a označ ${HASHTAG}`,
+      )
+    },
+    // Facebook: odkaz na hru s hashtagom, text s výsledkom je v schránke na vloženie
+    async facebook() {
+      window.open(FB_SHARER, '_blank', 'noopener,width=640,height=560')
+      flash((await copyText()) ? `📘 Text s výsledkom a ${HASHTAG} je v schránke, vlož ho do príspevku` : `📘 Zdieľaj s ${HASHTAG}`)
+    },
+    share() {
+      if (shareImage(true) === false) flash(`Obrázok stiahnutý, pridaj ho s ${HASHTAG} 📸`)
     },
     download() {
       download()
       flash('Obrázok stiahnutý ⬇️')
     },
     async copy() {
-      try {
-        await navigator.clipboard.writeText(text)
-        flash('Skopírované! ✅')
-      } catch {
-        flash('Kopírovanie zlyhalo 😕')
-      }
+      flash((await copyText()) ? 'Skopírované! ✅' : 'Kopírovanie zlyhalo 😕')
     },
     restart: () => onRestart?.(),
   }
