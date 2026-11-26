@@ -5,6 +5,7 @@ import { showLobby } from './lobby.js'
 import { showResults } from './results.js'
 import { sfx, music, toggleMute, isMuted } from './sfx.js'
 import { attachReactions, showWatch } from './fun/reactions.js'
+import './online.js' // LIVE počet ľudí v appke na hernej obrazovke
 
 const $ = (sel) => document.querySelector(sel)
 const nameInput = $('#name')

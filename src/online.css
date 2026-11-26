@@ -1,0 +1,31 @@
+.online-badge {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+  padding: 0.3em 0.9em;
+  border-radius: 999px;
+  background: rgba(10, 14, 40, 0.72);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: var(--fg);
+  font-weight: 800;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.online-badge[hidden] { display: none; }
+.online-badge.is-bump { animation: online-bump 0.4s ease-out; }
+
+.online-dot {
+  width: 0.6em;
+  height: 0.6em;
+  border-radius: 50%;
+  background: #3ddc84;
+  box-shadow: 0 0 0.6em #3ddc84;
+  animation: online-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes online-pulse { 50% { opacity: 0.35; transform: scale(0.7); } }
+@keyframes online-bump { 40% { transform: translateX(-50%) scale(1.18); } }
