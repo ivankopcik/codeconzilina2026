@@ -5,6 +5,7 @@ import { drawBackground, drawGround, updateSnow, drawSnow } from '../gfx/scene.j
 import { drawPlayer, drawSnowman } from '../gfx/actors.js'
 import { drawHUD, drawAim, drawOver, drawSlowmo, resetHud } from '../gfx/hud.js'
 import { resetFx, updateFx, drawBall, drawFx, drawFlash, drawConfetti } from '../gfx/fx.js'
+import { resetGust, updateGust, drawGust } from '../gfx/gust.js'
 import { rand, clamp } from '../gfx/util.js'
 
 const SHAKE_PX = 14
@@ -17,11 +18,13 @@ export function render(ctx, s) {
     lastT = s.t
     resetFx()
     resetHud()
+    resetGust()
   }
   const dt = clamp(s.t - lastT, 0, 0.05)
   lastT = s.t
   updateSnow(dt, s.t, (s.wind || 0) / WIND_MAX)
   updateFx(dt, s)
+  updateGust(dt, s)
 
   const sh = (s.shake || 0) * SHAKE_PX
   const cam = { x: sh ? rand(-sh, sh) : 0, y: sh ? rand(-sh, sh) : 0 }
@@ -40,6 +43,7 @@ export function render(ctx, s) {
   drawBall(ctx, s)
   drawFx(ctx, s)
   drawSnow(ctx, 1)
+  drawGust(ctx, s)
   ctx.restore()
 
   drawFlash(ctx, s)
