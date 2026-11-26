@@ -55,6 +55,29 @@
 .lobby-dots i:nth-child(2) { animation-delay: 0.2s; }
 .lobby-dots i:nth-child(3) { animation-delay: 0.4s; }
 
+/* Mobil na šírku: QR vľavo, zvyšok vpravo, aby bol QR celý viditeľný bez scrollu */
+@media (orientation: landscape) and (max-height: 760px) {
+  .lobby:has(.lobby-qr) {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    column-gap: calc(var(--gap) * 2);
+    row-gap: 6px;
+    width: min(96vw, 760px);
+    padding: var(--gap) calc(var(--gap) * 1.5);
+  }
+  .lobby:has(.lobby-qr) .lobby-body { display: contents; }
+  .lobby:has(.lobby-qr) > *, .lobby:has(.lobby-qr) .lobby-body > * { grid-column: 2; }
+  .lobby .lobby-body > .lobby-qr {
+    grid-column: 1;
+    grid-row: 1 / span 7;
+    width: min(280px, calc(100dvh - var(--gap) * 4)) !important;
+  }
+  .lobby .lobby-title { font-size: 1.6rem; }
+  .lobby .lobby-code { font-size: 2.6rem; }
+  .lobby .lobby-invite { font-size: 1.05rem; }
+}
+
 @keyframes lobby-blink {
   0%, 80%, 100% { opacity: 0.15; }
   40% { opacity: 1; }
