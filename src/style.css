@@ -1,0 +1,79 @@
+:root {
+  --bg: #0b1026;
+  --bg-2: #1b2a5c;
+  --fg: #ffffff;
+  --muted: #b9c3e6;
+  --accent: #e63946;
+  --accent-2: #2ec4b6;
+  --gold: #ffd166;
+  --card: rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.18);
+  --radius: 18px;
+  --gap: 14px;
+  --font: 'Nunito', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  font-family: var(--font);
+  color: var(--fg);
+  background: radial-gradient(ellipse at top, var(--bg-2), var(--bg) 70%);
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.screen { display: none; position: fixed; inset: 0; overflow: auto; }
+.screen.active { display: grid; place-items: center; }
+#screen-game.active { display: block; overflow: hidden; }
+#game { display: block; width: 100%; height: 100%; touch-action: none; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: calc(var(--gap) * 2);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  width: min(92vw, 460px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.title { margin: 0; font-size: clamp(2rem, 6vw, 3rem); line-height: 1.1; text-align: center; }
+.subtitle, .footer { margin: 0; text-align: center; color: var(--muted); }
+.footer { font-size: 0.85rem; }
+.row { display: flex; gap: var(--gap); }
+.row > .input { flex: 1; min-width: 0; }
+
+.input {
+  font: inherit;
+  font-size: 1.2rem;
+  padding: 14px 16px;
+  border-radius: calc(var(--radius) / 1.5);
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--fg);
+  outline: none;
+}
+.input:focus { border-color: var(--accent-2); }
+#room { text-transform: uppercase; letter-spacing: 0.3em; text-align: center; }
+
+.btn {
+  font: inherit;
+  font-size: 1.15rem;
+  font-weight: 800;
+  padding: 14px 20px;
+  border-radius: calc(var(--radius) / 1.5);
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--fg);
+  cursor: pointer;
+  transition: transform 0.12s, filter 0.12s;
+}
+.btn:hover { filter: brightness(1.15); }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: linear-gradient(135deg, var(--accent), #ff7b54); border: none; }
+
+.menu.joining [data-action='join'] { background: linear-gradient(135deg, var(--accent-2), #3a86ff); border: none; }

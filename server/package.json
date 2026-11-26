@@ -1,0 +1,9 @@
+{
+  "name": "gulovacka-api",
+  "private": true,
+  "type": "module",
+  "main": "index.js",
+  "dependencies": {
+    "ws": "^8.23.0"
+  }
+}

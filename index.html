@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="sk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0b1026">
+  <title>Vianočná guľovačka · CODECON Žilina</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>❄️</text></svg>">
+</head>
+<body>
+  <section id="screen-menu" class="screen active">
+    <div class="card menu">
+      <h1 class="title">❄️ Vianočná guľovačka</h1>
+      <p class="subtitle">Trafíš súpera 5× skôr ako on teba?</p>
+      <input id="name" class="input" maxlength="16" placeholder="Tvoje meno" autocomplete="nickname">
+      <button class="btn btn-primary" data-action="cpu">🤖 Hraj proti počítaču</button>
+      <button class="btn btn-primary" data-action="vs">🌐 VS online – vytvor hru</button>
+      <div class="row">
+        <input id="room" class="input" maxlength="4" placeholder="KÓD" autocapitalize="characters">
+        <button class="btn" data-action="join">Pripojiť sa</button>
+      </div>
+      <p class="footer">CODECON Žilina 2026 · #CodeconGulovacka</p>
+    </div>
+  </section>
+  <section id="screen-lobby" class="screen"></section>
+  <section id="screen-game" class="screen"><canvas id="game"></canvas></section>
+  <section id="screen-results" class="screen"></section>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
