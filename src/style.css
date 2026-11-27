@@ -179,4 +179,4 @@ body {
 .avatar-emoji { font-size: 2rem; line-height: 56px; }
 .avatar small { font-size: 0.7rem; color: var(--muted); }
 .avatar[aria-checked='true'] { border-color: var(--gold); transform: translateY(-2px); box-shadow: 0 0 16px rgba(255, 209, 102, 0.5); }
-@media (max-width: 420px) { .avatars { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 420px) { .avatars { grid-template-columns: repeat(4, 1fr); } }

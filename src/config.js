@@ -12,6 +12,8 @@ export const AVATARS = [
   { id: 'robot', label: 'Robot', emoji: '🤖' },
   { id: 'penguin', label: 'Tučniak', emoji: '🐧' },
   { id: 'reindeer', label: 'Sob', emoji: '🦌' },
+  { id: 'raptor', label: 'Raptor', emoji: '🦖' },
+  { id: 'mikulas', label: 'Mikuláš', emoji: '🧔' },
 ]
 export const AVATAR_IDS = AVATARS.map((a) => a.id)
 export const DEFAULT_AVATARS = ['boy', 'robot'] // hráč vľavo, počítač

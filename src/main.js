@@ -47,7 +47,8 @@ function playerName() {
 
 // Výber postavičky: náhľad z /assets/avatars/<id>.webp, ak chýba, ukáže sa emoji
 const picker = $('#avatars')
-picker.style.setProperty('--n', AVATARS.length) // počet stĺpcov podľa počtu postavičiek
+// stĺpce: do 6 postavičiek v jednom riadku, viac → dva riadky
+picker.style.setProperty('--n', AVATARS.length > 6 ? Math.ceil(AVATARS.length / 2) : AVATARS.length)
 let avatar = AVATAR_IDS.includes(localStorage.getItem('avatar')) ? localStorage.getItem('avatar') : DEFAULT_AVATARS[0]
 picker.innerHTML = AVATARS.map(
   (a) => `<button type="button" class="avatar" data-avatar="${a.id}" role="radio" aria-label="${a.label}">
